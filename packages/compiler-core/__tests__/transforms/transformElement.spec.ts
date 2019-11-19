@@ -1,17 +1,16 @@
-import {
-  ElementNode,
-  CompilerOptions,
-  parse,
-  transform,
-  ErrorCodes
-} from '../../src'
+import { CompilerOptions, parse, transform, ErrorCodes } from '../../src'
 import {
   RESOLVE_COMPONENT,
   CREATE_VNODE,
   MERGE_PROPS,
   RESOLVE_DIRECTIVE,
-  APPLY_DIRECTIVES,
-  TO_HANDLERS
+  WITH_DIRECTIVES,
+  TO_HANDLERS,
+  helperNameMap,
+  PORTAL,
+  RESOLVE_DYNAMIC_COMPONENT,
+  SUSPENSE,
+  KEEP_ALIVE
 } from '../../src/runtimeHelpers'
 import {
   CallExpression,
@@ -26,7 +25,7 @@ import { transformOn } from '../../src/transforms/vOn'
 import { transformBind } from '../../src/transforms/vBind'
 import { PatchFlags } from '@vue/shared'
 import { createObjectMatcher, genFlagText } from '../testUtils'
-import { optimizeText } from '../../src/transforms/optimizeText'
+import { transformText } from '../../src/transforms/transformText'
 
 function parseWithElementTransform(
   template: string,
@@ -35,18 +34,28 @@ function parseWithElementTransform(
   root: RootNode
   node: CallExpression
 } {
-  const ast = parse(template, options)
+  // wrap raw template in an extra div so that it doesn't get turned into a
+  // block as root node
+  const ast = parse(`<div>${template}</div>`, options)
   transform(ast, {
-    nodeTransforms: [optimizeText, transformElement],
+    nodeTransforms: [transformElement, transformText],
     ...options
   })
-  const codegenNode = (ast.children[0] as ElementNode)
+  const codegenNode = (ast as any).children[0].children[0]
     .codegenNode as CallExpression
   expect(codegenNode.type).toBe(NodeTypes.JS_CALL_EXPRESSION)
   return {
     root: ast,
     node: codegenNode
   }
+}
+
+function parseWithBind(template: string) {
+  return parseWithElementTransform(template, {
+    directiveTransforms: {
+      bind: transformBind
+    }
+  })
 }
 
 describe('compiler: element transform', () => {
@@ -258,6 +267,99 @@ describe('compiler: element transform', () => {
     ])
   })
 
+  test('should handle <Portal> with normal children', () => {
+    function assert(tag: string) {
+      const { root, node } = parseWithElementTransform(
+        `<${tag} target="#foo"><span /></${tag}>`
+      )
+      expect(root.components.length).toBe(0)
+      expect(root.helpers).toContain(PORTAL)
+      expect(node.callee).toBe(CREATE_VNODE)
+      expect(node.arguments).toMatchObject([
+        PORTAL,
+        createObjectMatcher({
+          target: '#foo'
+        }),
+        [
+          {
+            type: NodeTypes.ELEMENT,
+            tag: 'span',
+            codegenNode: {
+              callee: CREATE_VNODE,
+              arguments: [`"span"`]
+            }
+          }
+        ]
+      ])
+    }
+
+    assert(`portal`)
+    assert(`Portal`)
+  })
+
+  test('should handle <Suspense>', () => {
+    function assert(tag: string, content: string, hasFallback?: boolean) {
+      const { root, node } = parseWithElementTransform(
+        `<${tag}>${content}</${tag}>`
+      )
+      expect(root.components.length).toBe(0)
+      expect(root.helpers).toContain(SUSPENSE)
+      expect(node.callee).toBe(CREATE_VNODE)
+      expect(node.arguments).toMatchObject([
+        SUSPENSE,
+        `null`,
+        hasFallback
+          ? createObjectMatcher({
+              default: {
+                type: NodeTypes.JS_FUNCTION_EXPRESSION
+              },
+              fallback: {
+                type: NodeTypes.JS_FUNCTION_EXPRESSION
+              },
+              _compiled: `[true]`
+            })
+          : createObjectMatcher({
+              default: {
+                type: NodeTypes.JS_FUNCTION_EXPRESSION
+              },
+              _compiled: `[true]`
+            })
+      ])
+    }
+
+    assert(`suspense`, `foo`)
+    assert(`suspense`, `<template #default>foo</template>`)
+    assert(
+      `suspense`,
+      `<template #default>foo</template><template #fallback>fallback</template>`,
+      true
+    )
+  })
+
+  test('should handle <KeepAlive>', () => {
+    function assert(tag: string) {
+      const { root, node } = parseWithElementTransform(
+        `<${tag}><span /></${tag}>`
+      )
+      expect(root.components.length).toBe(0)
+      expect(root.helpers).toContain(KEEP_ALIVE)
+      expect(node.callee).toBe(CREATE_VNODE)
+      expect(node.arguments).toMatchObject([
+        KEEP_ALIVE,
+        `null`,
+        createObjectMatcher({
+          default: {
+            type: NodeTypes.JS_FUNCTION_EXPRESSION
+          },
+          _compiled: `[true]`
+        })
+      ])
+    }
+
+    assert(`keep-alive`)
+    assert(`KeepAlive`)
+  })
+
   test('error on v-bind with no argument', () => {
     const onError = jest.fn()
     parseWithElementTransform(`<div v-bind/>`, { onError })
@@ -275,7 +377,7 @@ describe('compiler: element transform', () => {
         foo(dir) {
           _dir = dir
           return {
-            props: createObjectProperty(dir.arg!, dir.exp!),
+            props: [createObjectProperty(dir.arg!, dir.exp!)],
             needRuntime: false
           }
         }
@@ -315,7 +417,7 @@ describe('compiler: element transform', () => {
     expect(root.helpers).toContain(RESOLVE_DIRECTIVE)
     expect(root.directives).toContain(`foo`)
 
-    expect(node.callee).toBe(APPLY_DIRECTIVES)
+    expect(node.callee).toBe(WITH_DIRECTIVES)
     expect(node.arguments).toMatchObject([
       {
         type: NodeTypes.JS_CALL_EXPRESSION,
@@ -353,6 +455,29 @@ describe('compiler: element transform', () => {
     ])
   })
 
+  test('directiveTransform with needRuntime: Symbol', () => {
+    const { root, node } = parseWithElementTransform(
+      `<div v-foo:bar="hello" />`,
+      {
+        directiveTransforms: {
+          foo() {
+            return {
+              props: [],
+              needRuntime: CREATE_VNODE
+            }
+          }
+        }
+      }
+    )
+
+    expect(root.helpers).toContain(CREATE_VNODE)
+    expect(root.helpers).not.toContain(RESOLVE_DIRECTIVE)
+    expect(root.directives.length).toBe(0)
+    expect((node as any).arguments[1].elements[0].elements[0]).toBe(
+      `_${helperNameMap[CREATE_VNODE]}`
+    )
+  })
+
   test('runtime directives', () => {
     const { root, node } = parseWithElementTransform(
       `<div v-foo v-bar="x" v-baz:[arg].mod.mad="y" />`
@@ -362,7 +487,7 @@ describe('compiler: element transform', () => {
     expect(root.directives).toContain(`bar`)
     expect(root.directives).toContain(`baz`)
 
-    expect(node.callee).toBe(APPLY_DIRECTIVES)
+    expect(node.callee).toBe(WITH_DIRECTIVES)
     expect(node.arguments).toMatchObject([
       {
         type: NodeTypes.JS_CALL_EXPRESSION
@@ -559,14 +684,6 @@ describe('compiler: element transform', () => {
   })
 
   describe('patchFlag analysis', () => {
-    function parseWithBind(template: string) {
-      return parseWithElementTransform(template, {
-        directiveTransforms: {
-          bind: transformBind
-        }
-      })
-    }
-
     test('TEXT', () => {
       const { node } = parseWithBind(`<div>foo</div>`)
       expect(node.arguments.length).toBe(3)
@@ -648,6 +765,33 @@ describe('compiler: element transform', () => {
       const vnodeCall = node.arguments[0] as CallExpression
       expect(vnodeCall.arguments.length).toBe(4)
       expect(vnodeCall.arguments[3]).toBe(genFlagText(PatchFlags.NEED_PATCH))
+    })
+  })
+
+  describe('dynamic component', () => {
+    test('static binding', () => {
+      const { node, root } = parseWithBind(`<component is="foo" />`)
+      expect(root.helpers).not.toContain(RESOLVE_DYNAMIC_COMPONENT)
+      expect(node).toMatchObject({
+        callee: CREATE_VNODE,
+        arguments: ['_component_foo']
+      })
+    })
+
+    test('dynamic binding', () => {
+      const { node, root } = parseWithBind(`<component :is="foo" />`)
+      expect(root.helpers).toContain(RESOLVE_DYNAMIC_COMPONENT)
+      expect(node.arguments).toMatchObject([
+        {
+          callee: RESOLVE_DYNAMIC_COMPONENT,
+          arguments: [
+            {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'foo'
+            }
+          ]
+        }
+      ])
     })
   })
 })

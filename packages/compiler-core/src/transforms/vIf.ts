@@ -23,20 +23,17 @@ import {
   BlockCodegenNode,
   SlotOutletCodegenNode,
   ElementCodegenNode,
-  ComponentCodegenNode,
-  ElementCodegenNodeWithDirective,
-  CompoenntCodegenNodeWithDirective
+  ComponentCodegenNode
 } from '../ast'
 import { createCompilerError, ErrorCodes } from '../errors'
 import { processExpression } from './transformExpression'
 import {
   OPEN_BLOCK,
   CREATE_BLOCK,
-  EMPTY,
   FRAGMENT,
-  APPLY_DIRECTIVES,
+  WITH_DIRECTIVES,
   CREATE_VNODE,
-  RENDER_SLOT
+  CREATE_COMMENT
 } from '../runtimeHelpers'
 import { injectProp } from '../utils'
 
@@ -49,7 +46,7 @@ export const transformIf = createStructuralDirectiveTransform(
     ) {
       const loc = dir.exp ? dir.exp.loc : node.loc
       context.onError(
-        createCompilerError(ErrorCodes.X_IF_NO_EXPRESSION, dir.loc)
+        createCompilerError(ErrorCodes.X_V_IF_NO_EXPRESSION, dir.loc)
       )
       dir.exp = createSimpleExpression(`true`, false, loc)
     }
@@ -128,7 +125,7 @@ export const transformIf = createStructuralDirectiveTransform(
           }
         } else {
           context.onError(
-            createCompilerError(ErrorCodes.X_ELSE_NO_ADJACENT_IF, node.loc)
+            createCompilerError(ErrorCodes.X_V_ELSE_NO_ADJACENT_IF, node.loc)
           )
         }
         break
@@ -155,8 +152,11 @@ function createCodegenNodeForBranch(
     return createConditionalExpression(
       branch.condition,
       createChildrenCodegenNode(branch, index, context),
-      createCallExpression(context.helper(CREATE_BLOCK), [
-        context.helper(EMPTY)
+      // make sure to pass in asBlock: true so that the comment node call
+      // closes the current block.
+      createCallExpression(context.helper(CREATE_COMMENT), [
+        __DEV__ ? '"v-if"' : '""',
+        'true'
       ])
     ) as IfConditionalExpression
   } else {
@@ -196,32 +196,18 @@ function createChildrenCodegenNode(
     const childCodegen = (child as ElementNode).codegenNode as
       | ElementCodegenNode
       | ComponentCodegenNode
-      | ElementCodegenNodeWithDirective
-      | CompoenntCodegenNodeWithDirective
       | SlotOutletCodegenNode
     let vnodeCall = childCodegen
     // Element with custom directives. Locate the actual createVNode() call.
-    if (vnodeCall.callee === APPLY_DIRECTIVES) {
+    if (vnodeCall.callee === WITH_DIRECTIVES) {
       vnodeCall = vnodeCall.arguments[0]
     }
     // Change createVNode to createBlock.
     if (vnodeCall.callee === CREATE_VNODE) {
-      ;(vnodeCall as any).callee = helper(CREATE_BLOCK)
+      vnodeCall.callee = helper(CREATE_BLOCK)
     }
-    // It's possible to have renderSlot() here as well - which already produces
-    // a block, so no need to change the callee. However it accepts props at
-    // a different arg index so make sure to check for so that the key injection
-    // logic below works for it too.
-    const propsIndex = vnodeCall.callee === RENDER_SLOT ? 2 : 1
     // inject branch key
-    const existingProps = vnodeCall.arguments[
-      propsIndex
-    ] as ElementCodegenNode['arguments'][1]
-    vnodeCall.arguments[propsIndex] = injectProp(
-      existingProps,
-      keyProperty,
-      context
-    )
+    injectProp(vnodeCall, keyProperty, context)
     return childCodegen
   }
 }
