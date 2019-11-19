@@ -77,6 +77,15 @@ export function readonly(target: object) {
   )
 }
 
+/**
+ * 
+ * @param target 
+ * @param toProxy map结构用来保存原始数据和可响应数据
+ * @param toRaw map结构用来保存可响应数据和原始数据
+ * @param baseHandlers 
+ * @param collectionHandlers 
+ * @returns 返回代理后的对象
+ */
 function createReactiveObject(
   target: any,
   toProxy: WeakMap<any, any>,
