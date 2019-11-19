@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>reactive</title>
+  </head>
+  <body>
+    <!--引入打包好的global.js文件-->
+    <script src="../dist/reactivity.global.js"></script>
+    <script>
+      const counter = VueObserver.reactive({ num: 0, arr: [1, 2, 3] })
+      VueObserver.effect(
+        () => {
+          console.log('observerd', counter.num)
+          console.log('observerd', counter.arr)
+        })
+    </script>
+  </body>
+</html>
