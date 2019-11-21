@@ -101,15 +101,14 @@ export function readonlyProps<T extends object>(
   )
 }
 
-
 /**
- * 
- * @param target 
- * @param toProxy map结构用来保存原始数据和可响应数据
- * @param toRaw map结构用来保存可响应数据和原始数据
- * @param baseHandlers 
- * @param collectionHandlers 
- * @returns 返回代理后的对象
+ *
+ * @param target
+ * @param toProxy 通过原始值，找已经代理过的值
+ * @param toRaw 通过已经代理过的值，找原始值
+ * @param baseHandlers
+ * @param collectionHandlers
+ * @returns
  */
 function createReactiveObject(
   target: unknown,
@@ -125,6 +124,7 @@ function createReactiveObject(
     return target
   }
   // target already has corresponding Proxy
+  // 目标已经有相应的代理。
   let observed = toProxy.get(target)
   if (observed !== void 0) {
     return observed
@@ -144,6 +144,8 @@ function createReactiveObject(
   toProxy.set(target, observed)
   toRaw.set(observed, target)
   if (!targetMap.has(target)) {
+    // 为什么在原始值上关联一个map对象？
+    // 在effect中使用
     targetMap.set(target, new Map())
   }
   return observed
