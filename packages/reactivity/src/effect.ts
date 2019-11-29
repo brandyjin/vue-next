@@ -115,6 +115,7 @@ export function resumeTracking() {
   shouldTrack = true
 }
 
+//  把原始数据的每个属性，和effect对象做相互关联。
 export function track(target: object, type: OperationTypes, key?: unknown) {
   if (!shouldTrack || effectStack.length === 0) {
     return

@@ -7,15 +7,28 @@
     <title>reactive</title>
   </head>
   <body>
+    <button onclick="add()">Add</button>
+    <button onclick="pushArr()">Push</button>
     <!--引入打包好的global.js文件-->
     <script src="../dist/reactivity.global.js"></script>
     <script>
       const counter = VueObserver.reactive({ num: 0, arr: [1, 2, 3] })
+      let count = 1
       VueObserver.effect(
         () => {
           console.log('observerd', counter.num)
           console.log('observerd', counter.arr)
         })
+
+      function add () {
+        counter.num++
+      }
+
+      function pushArr () {
+        // counter.arr.push(count++)
+        counter.arr[counter.arr.length + count] = count++
+        console.log(counter.arr)
+      }
     </script>
   </body>
 </html>
