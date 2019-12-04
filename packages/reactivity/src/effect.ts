@@ -120,6 +120,7 @@ export function track(target: object, type: OperationTypes, key?: unknown) {
   if (!shouldTrack || effectStack.length === 0) {
     return
   }
+  // 取出最后一次调用的effect，所以只取一次
   const effect = effectStack[effectStack.length - 1]
   if (type === OperationTypes.ITERATE) {
     key = ITERATE_KEY
@@ -132,6 +133,8 @@ export function track(target: object, type: OperationTypes, key?: unknown) {
   if (dep === void 0) {
     depsMap.set(key!, (dep = new Set()))
   }
+  // 只取出过一次，effectstack是什么时候加入的那？
+  // ---> effectStack是在调用effect的时候加入的。
   if (!dep.has(effect)) {
     dep.add(effect)
     effect.deps.push(dep)
@@ -161,7 +164,9 @@ export function trigger(
   const computedRunners = new Set<ReactiveEffect>()
   if (type === OperationTypes.CLEAR) {
     // collection being cleared, trigger all effects for target
+    // depsMap: {a : effect, b：effect} ？？？
     depsMap.forEach(dep => {
+      // dep: 和目标数据属性key 关联的effects ？？？
       addRunners(effects, computedRunners, dep)
     })
   } else {
@@ -191,6 +196,7 @@ function addRunners(
 ) {
   if (effectsToAdd !== void 0) {
     effectsToAdd.forEach(effect => {
+      // 如果添加到computed里就不加到effects。只能一个方法发生变化？
       if (effect.options.computed) {
         computedRunners.add(effect)
       } else {
@@ -214,6 +220,7 @@ function scheduleRun(
       key,
       type
     }
+    // onTrigger从哪里来？
     effect.options.onTrigger(extraInfo ? extend(event, extraInfo) : event)
   }
   if (effect.options.scheduler !== void 0) {

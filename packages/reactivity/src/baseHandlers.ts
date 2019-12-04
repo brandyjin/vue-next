@@ -11,12 +11,19 @@ const builtInSymbols = new Set(
     .filter(isSymbol)
 )
 
+/**
+ * 
+ * @param isReadonly 
+ * @param unwrap 这个是什么意思？
+ */
 function createGetter(isReadonly: boolean, unwrap: boolean = true) {
   return function get(target: object, key: string | symbol, receiver: object) {
+    // 这一步是做什么操作？
     let res = Reflect.get(target, key, receiver)
     if (isSymbol(key) && builtInSymbols.has(key)) {
       return res
     }
+    // isRef是什么意思？
     if (unwrap && isRef(res)) {
       res = res.value
     } else {
@@ -38,13 +45,22 @@ function set(
   value: unknown,
   receiver: object
 ): boolean {
+  // 得到没有被观察的对象，那么这个value是什么值？
   value = toRaw(value)
+
+  // 得到target key属性的值
   const oldValue = (target as any)[key]
+
+  // 修改老的值 ？？？？
   if (isRef(oldValue) && !isRef(value)) {
     oldValue.value = value
     return true
   }
+
+  // 判断原始数据是否有这个属性
   const hadKey = hasOwn(target, key)
+
+  // Reflect是干什么的？receiver是什么值?
   const result = Reflect.set(target, key, value, receiver)
   // don't trigger if target is something up in the prototype chain of original
   if (target === toRaw(receiver)) {
