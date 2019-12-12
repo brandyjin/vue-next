@@ -41,14 +41,23 @@ export function isEffect(fn: any): fn is ReactiveEffect {
   return fn != null && fn._isEffect === true
 }
 
+/**
+ * 这个是非常重要的方法， computed，watch， domupdate，都是通过这个方法实现追踪和触发的。
+ * @param fn observe 值改变时执行的方法。
+ * @param options 参数
+ */
 export function effect<T = any>(
   fn: () => T,
   options: ReactiveEffectOptions = EMPTY_OBJ
 ): ReactiveEffect<T> {
   if (isEffect(fn)) {
-    fn = fn.raw
+    fn = fn.raw // 输入什么返回什么。
   }
   const effect = createReactiveEffect(fn, options)
+
+  // lazy false 立即执行effect一次
+  // lazy true时不在创建时执行，但是 observe的值改变的时候再执行
+  // 可以通过参数设置
   if (!options.lazy) {
     effect()
   }
@@ -69,6 +78,9 @@ function createReactiveEffect<T = any>(
   fn: () => T,
   options: ReactiveEffectOptions
 ): ReactiveEffect<T> {
+  // 返回的是这个effect(...args) ==> run(effect, fn, args)
+  // watch ==> effect(getter, {...options}) ==>  ？？？？
+  // run(effect, getter, {getter, {...options}}) ？？？？
   const effect = function reactiveEffect(...args: unknown[]): unknown {
     return run(effect, fn, args)
   } as ReactiveEffect
@@ -81,6 +93,7 @@ function createReactiveEffect<T = any>(
 }
 
 function run(effect: ReactiveEffect, fn: Function, args: unknown[]): unknown {
+  // 没创建过，没有被激活， 那么则执行 fn（getter） ？？？？
   if (!effect.active) {
     return fn(...args)
   }
@@ -220,7 +233,7 @@ function scheduleRun(
       key,
       type
     }
-    // onTrigger从哪里来？
+    // onTrigger从哪里来？ ====> 在调用effect方法传进来的，watch和computed 都有调用。
     effect.options.onTrigger(extraInfo ? extend(event, extraInfo) : event)
   }
   if (effect.options.scheduler !== void 0) {
