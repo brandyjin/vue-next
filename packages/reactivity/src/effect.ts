@@ -131,6 +131,8 @@ export function track(target: object, type: OperationTypes, key?: unknown) {
   }
   let dep = depsMap.get(key!)
   if (dep === void 0) {
+    // 为每个key关联一个set对象，存储effect。
+    // 就是记录下使用了这个属性的effect方法，当这个属性改变的时候可以执行关联的方法
     depsMap.set(key!, (dep = new Set()))
   }
   // 只取出过一次，effectstack是什么时候加入的那？
@@ -155,6 +157,7 @@ export function trigger(
   key?: unknown,
   extraInfo?: DebuggerEventExtraInfo
 ) {
+  // 取出被代理过的原始对象。在reactive中给targetMap赋值。
   const depsMap = targetMap.get(target)
   if (depsMap === void 0) {
     // never been tracked
@@ -164,9 +167,9 @@ export function trigger(
   const computedRunners = new Set<ReactiveEffect>()
   if (type === OperationTypes.CLEAR) {
     // collection being cleared, trigger all effects for target
-    // depsMap: {a : effect, b：effect} ？？？
+    // depsMap: {a : {effect1, effect2}, b：{effect}} 
     depsMap.forEach(dep => {
-      // dep: 和目标数据属性key 关联的effects ？？？
+      // dep: 和目标数据属性key 关联的effects ==> {effect1, effect2} 
       addRunners(effects, computedRunners, dep)
     })
   } else {

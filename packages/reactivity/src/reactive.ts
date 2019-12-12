@@ -145,7 +145,7 @@ function createReactiveObject(
   toRaw.set(observed, target)
   if (!targetMap.has(target)) {
     // 为什么在原始值上关联一个map对象？
-    // 在effect中使用
+    // 存储调用了reactive()的对象
     targetMap.set(target, new Map())
   }
   return observed

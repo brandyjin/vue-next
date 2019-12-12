@@ -14,11 +14,10 @@
     <script>
       const counter = VueObserver.reactive({ num: 0, arr: [1, 2, 3] })
       let count = 1
-      VueObserver.effect(
-        () => {
-          console.log('observerd', counter.num)
-          console.log('observerd', counter.arr)
-        })
+      VueObserver.effect(() => {
+        console.log('observerd', counter.num)
+        console.log('observerd', counter.arr)
+      })
 
       function add () {
         counter.num++
