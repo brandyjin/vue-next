@@ -14,9 +14,13 @@
     <script>
       const counter = VueObserver.reactive({ num: 0, arr: [1, 2, 3] })
       let count = 1
+
+      const showNum = VueObserver.computed(() => counter.num + 'show')
+      
       VueObserver.effect(() => {
-        console.log('observerd', counter.num)
-        console.log('observerd', counter.arr)
+        // console.log('observerd', counter.num)
+        // console.log('observerd', counter.arr)
+        console.log('observerd', showNum.value)
       })
 
       function add () {

@@ -10,7 +10,7 @@ export interface WritableComputedRef<T> extends Ref<T> {
   readonly effect: ReactiveEffect<T>
 }
 
-export type ComputedGetter<T> = () => T
+export type ComputedGetter<T> = () => T // 返回带值得getter
 export type ComputedSetter<T> = (v: T) => void
 
 export interface WritableComputedOptions<T> {
@@ -22,6 +22,8 @@ export function computed<T>(getter: ComputedGetter<T>): ComputedRef<T>
 export function computed<T>(
   options: WritableComputedOptions<T>
 ): WritableComputedRef<T>
+
+// 传进来的参数是带返回值的方法
 export function computed<T>(
   getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>
 ) {
@@ -55,6 +57,7 @@ export function computed<T>(
     _isRef: true,
     // expose effect so computed can be stopped
     effect: runner,
+    // computed.value的时候执行
     get value() {
       if (dirty) {
         value = runner()
@@ -76,9 +79,16 @@ function trackChildRun(childRunner: ReactiveEffect) {
   if (effectStack.length === 0) {
     return
   }
+  // parent是什么概念？  调用了computed属性的方法，可能是watch、effect
+  // parentRunner 取出最新一次调用的effect（调用computed属性的parent）
   const parentRunner = effectStack[effectStack.length - 1]
+
+  // childRunner is （）=> T
+  // cr.deps 实在get的时候时候加的，和 reactive.key 关联的effects
+  // dep是取出所有和 computed中使用的reactive key关联的effects。
   for (let i = 0; i < childRunner.deps.length; i++) {
     const dep = childRunner.deps[i]
+    // 如果其中没有parentRunner，则关联。
     if (!dep.has(parentRunner)) {
       dep.add(parentRunner)
       parentRunner.deps.push(dep)
