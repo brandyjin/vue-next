@@ -1,14 +1,16 @@
 import {
   ComponentInternalInstance,
-  LifecycleHooks,
   currentInstance,
-  setCurrentInstance
+  isInSSRComponentSetup,
+  LifecycleHooks,
+  setCurrentInstance,
+  unsetCurrentInstance
 } from './component'
-import { ComponentPublicInstance } from './componentProxy'
+import { ComponentPublicInstance } from './componentPublicInstance'
 import { callWithAsyncErrorHandling, ErrorTypeStrings } from './errorHandling'
 import { warn } from './warning'
-import { capitalize } from '@vue/shared'
-import { pauseTracking, resumeTracking, DebuggerEvent } from '@vue/reactivity'
+import { toHandlerKey } from '@vue/shared'
+import { DebuggerEvent, pauseTracking, resetTracking } from '@vue/reactivity'
 
 export { onActivated, onDeactivated } from './components/KeepAlive'
 
@@ -17,7 +19,7 @@ export function injectHook(
   hook: Function & { __weh?: Function },
   target: ComponentInternalInstance | null = currentInstance,
   prepend: boolean = false
-) {
+): Function | undefined {
   if (target) {
     const hooks = target[type] || (target[type] = [])
     // cache the error handling wrapper for injected hooks so the same hook
@@ -37,8 +39,8 @@ export function injectHook(
         // can only be false when the user does something really funky.
         setCurrentInstance(target)
         const res = callWithAsyncErrorHandling(hook, target, type, args)
-        setCurrentInstance(null)
-        resumeTracking()
+        unsetCurrentInstance()
+        resetTracking()
         return res
       })
     if (prepend) {
@@ -46,10 +48,9 @@ export function injectHook(
     } else {
       hooks.push(wrappedHook)
     }
+    return wrappedHook
   } else if (__DEV__) {
-    const apiName = `on${capitalize(
-      ErrorTypeStrings[type].replace(/ hook$/, '')
-    )}`
+    const apiName = toHandlerKey(ErrorTypeStrings[type].replace(/ hook$/, ''))
     warn(
       `${apiName} is called when there is no active component instance to be ` +
         `associated with. ` +
@@ -62,10 +63,12 @@ export function injectHook(
   }
 }
 
-export const createHook = <T extends Function = () => any>(
-  lifecycle: LifecycleHooks
-) => (hook: T, target: ComponentInternalInstance | null = currentInstance) =>
-  injectHook(lifecycle, hook, target)
+export const createHook =
+  <T extends Function = () => any>(lifecycle: LifecycleHooks) =>
+  (hook: T, target: ComponentInternalInstance | null = currentInstance) =>
+    // post-create lifecycle registrations are noops during SSR (except for serverPrefetch)
+    (!isInSSRComponentSetup || lifecycle === LifecycleHooks.SERVER_PREFETCH) &&
+    injectHook(lifecycle, hook, target)
 
 export const onBeforeMount = createHook(LifecycleHooks.BEFORE_MOUNT)
 export const onMounted = createHook(LifecycleHooks.MOUNTED)
@@ -73,6 +76,7 @@ export const onBeforeUpdate = createHook(LifecycleHooks.BEFORE_UPDATE)
 export const onUpdated = createHook(LifecycleHooks.UPDATED)
 export const onBeforeUnmount = createHook(LifecycleHooks.BEFORE_UNMOUNT)
 export const onUnmounted = createHook(LifecycleHooks.UNMOUNTED)
+export const onServerPrefetch = createHook(LifecycleHooks.SERVER_PREFETCH)
 
 export type DebuggerHook = (e: DebuggerEvent) => void
 export const onRenderTriggered = createHook<DebuggerHook>(
@@ -82,11 +86,15 @@ export const onRenderTracked = createHook<DebuggerHook>(
   LifecycleHooks.RENDER_TRACKED
 )
 
-export type ErrorCapturedHook = (
-  err: Error,
+export type ErrorCapturedHook<TError = unknown> = (
+  err: TError,
   instance: ComponentPublicInstance | null,
   info: string
 ) => boolean | void
-export const onErrorCaptured = createHook<ErrorCapturedHook>(
-  LifecycleHooks.ERROR_CAPTURED
-)
+
+export function onErrorCaptured<TError = Error>(
+  hook: ErrorCapturedHook<TError>,
+  target: ComponentInternalInstance | null = currentInstance
+) {
+  injectHook(LifecycleHooks.ERROR_CAPTURED, hook, target)
+}

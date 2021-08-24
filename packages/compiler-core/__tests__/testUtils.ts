@@ -4,10 +4,15 @@ import {
   locStub,
   Namespaces,
   ElementTypes,
-  PlainElementCodegenNode
+  VNodeCall
 } from '../src'
-import { CREATE_VNODE } from '../src/runtimeHelpers'
-import { isString, PatchFlags, PatchFlagNames, isArray } from '@vue/shared'
+import {
+  isString,
+  PatchFlags,
+  PatchFlagNames,
+  isArray,
+  ShapeFlags
+} from '@vue/shared'
 
 const leadingBracketRE = /^\[/
 const bracketsRE = /^\[|\]$/g
@@ -39,7 +44,11 @@ export function createObjectMatcher(obj: Record<string, any>) {
 }
 
 export function createElementWithCodegen(
-  args: PlainElementCodegenNode['arguments']
+  tag: VNodeCall['tag'],
+  props?: VNodeCall['props'],
+  children?: VNodeCall['children'],
+  patchFlag?: VNodeCall['patchFlag'],
+  dynamicProps?: VNodeCall['dynamicProps']
 ): ElementNode {
   return {
     type: NodeTypes.ELEMENT,
@@ -51,22 +60,33 @@ export function createElementWithCodegen(
     props: [],
     children: [],
     codegenNode: {
-      type: NodeTypes.JS_CALL_EXPRESSION,
-      loc: locStub,
-      callee: CREATE_VNODE,
-      arguments: args
+      type: NodeTypes.VNODE_CALL,
+      tag,
+      props,
+      children,
+      patchFlag,
+      dynamicProps,
+      directives: undefined,
+      isBlock: false,
+      disableTracking: false,
+      isComponent: false,
+      loc: locStub
     }
   }
 }
 
-export function genFlagText(flag: PatchFlags | PatchFlags[]) {
+type Flags = PatchFlags | ShapeFlags
+export function genFlagText(
+  flag: Flags | Flags[],
+  names: { [k: number]: string } = PatchFlagNames
+) {
   if (isArray(flag)) {
     let f = 0
     flag.forEach(ff => {
       f |= ff
     })
-    return `${f} /* ${flag.map(f => PatchFlagNames[f]).join(', ')} */`
+    return `${f} /* ${flag.map(f => names[f]).join(', ')} */`
   } else {
-    return `${flag} /* ${PatchFlagNames[flag]} */`
+    return `${flag} /* ${names[flag]} */`
   }
 }

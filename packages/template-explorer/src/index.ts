@@ -1,8 +1,10 @@
 import * as m from 'monaco-editor'
-import { compile, CompilerError } from '@vue/compiler-dom'
-import { compilerOptions, initOptions } from './options'
-import { watch } from '@vue/runtime-dom'
+import { compile, CompilerError, CompilerOptions } from '@vue/compiler-dom'
+import { compile as ssrCompile } from '@vue/compiler-ssr'
+import { compilerOptions, initOptions, ssrMode } from './options'
+import { toRaw, watchEffect } from '@vue/runtime-dom'
 import { SourceMapConsumer } from 'source-map'
+import theme from './theme'
 
 declare global {
   interface Window {
@@ -12,40 +14,65 @@ declare global {
   }
 }
 
+interface PersistedState {
+  src: string
+  ssr: boolean
+  options: CompilerOptions
+}
+
+const sharedEditorOptions: m.editor.IStandaloneEditorConstructionOptions = {
+  fontSize: 14,
+  scrollBeyondLastLine: false,
+  renderWhitespace: 'selection',
+  minimap: {
+    enabled: false
+  }
+}
+
 window.init = () => {
   const monaco = window.monaco
-  const persistedState = JSON.parse(
+
+  monaco.editor.defineTheme('my-theme', theme)
+  monaco.editor.setTheme('my-theme')
+
+  const persistedState: PersistedState = JSON.parse(
     decodeURIComponent(window.location.hash.slice(1)) ||
       localStorage.getItem('state') ||
       `{}`
   )
 
+  ssrMode.value = persistedState.ssr
   Object.assign(compilerOptions, persistedState.options)
 
-  let lastSuccessfulCode: string = `/* See console for error */`
+  let lastSuccessfulCode: string
   let lastSuccessfulMap: SourceMapConsumer | undefined = undefined
   function compileCode(source: string): string {
     console.clear()
     try {
       const errors: CompilerError[] = []
-      const { code, ast, map } = compile(source, {
-        filename: 'template.vue',
+      const compileFn = ssrMode.value ? ssrCompile : compile
+      const start = performance.now()
+      const { code, ast, map } = compileFn(source, {
+        filename: 'ExampleTemplate.vue',
         ...compilerOptions,
         sourceMap: true,
         onError: err => {
           errors.push(err)
         }
       })
+      console.log(`Compiled in ${(performance.now() - start).toFixed(2)}ms.`)
       monaco.editor.setModelMarkers(
         editor.getModel()!,
         `@vue/compiler-dom`,
         errors.filter(e => e.loc).map(formatError)
       )
       console.log(`AST: `, ast)
+      console.log(`Options: `, toRaw(compilerOptions))
       lastSuccessfulCode = code + `\n\n// Check the console for the AST`
-      lastSuccessfulMap = new window._deps['source-map'].SourceMapConsumer(map)
+      lastSuccessfulMap = new SourceMapConsumer(map!)
       lastSuccessfulMap!.computeColumnSpans()
     } catch (e) {
+      lastSuccessfulCode = `/* ERROR: ${e.message} (see console for more info) */`
       console.error(e)
     }
     return lastSuccessfulCode
@@ -69,8 +96,9 @@ window.init = () => {
     // every time we re-compile, persist current state
     const state = JSON.stringify({
       src,
+      ssr: ssrMode.value,
       options: compilerOptions
-    })
+    } as PersistedState)
     localStorage.setItem('state', state)
     window.location.hash = encodeURIComponent(state)
     const res = compileCode(src)
@@ -79,22 +107,11 @@ window.init = () => {
     }
   }
 
-  const sharedEditorOptions: m.editor.IEditorConstructionOptions = {
-    theme: 'vs-dark',
-    fontSize: 14,
-    wordWrap: 'on',
-    scrollBeyondLastLine: false,
-    renderWhitespace: 'selection',
-    contextmenu: false,
-    minimap: {
-      enabled: false
-    }
-  }
-
   const editor = monaco.editor.create(document.getElementById('source')!, {
     value: persistedState.src || `<div>Hello World!</div>`,
     language: 'html',
-    ...sharedEditorOptions
+    ...sharedEditorOptions,
+    wordWrap: 'bounded'
   })
 
   editor.getModel()!.updateOptions({
@@ -131,7 +148,7 @@ window.init = () => {
       clearEditorDecos()
       if (lastSuccessfulMap) {
         const pos = lastSuccessfulMap.generatedPositionFor({
-          source: 'template.vue',
+          source: 'ExampleTemplate.vue',
           line: e.position.lineNumber,
           column: e.position.column - 1
         })
@@ -176,8 +193,10 @@ window.init = () => {
         if (
           pos.line != null &&
           pos.column != null &&
-          !// ignore mock location
-          (pos.line === 1 && pos.column === 0)
+          !(
+            // ignore mock location
+            (pos.line === 1 && pos.column === 0)
+          )
         ) {
           const translatedPos = {
             column: pos.column + 1,
@@ -206,7 +225,7 @@ window.init = () => {
   )
 
   initOptions()
-  watch(reCompile)
+  watchEffect(reCompile)
 }
 
 function debounce<T extends (...args: any[]) => any>(

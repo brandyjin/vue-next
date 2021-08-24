@@ -1,10 +1,13 @@
 import {
   CompilerOptions,
-  parse,
+  baseParse as parse,
   transform,
   NodeTypes,
-  generate
+  generate,
+  ForNode,
+  ElementNode
 } from '../../src'
+import { transformFor } from '../../src/transforms/vFor'
 import { transformText } from '../../src/transforms/transformText'
 import { transformExpression } from '../../src/transforms/transformExpression'
 import { transformElement } from '../../src/transforms/transformElement'
@@ -16,9 +19,10 @@ function transformWithTextOpt(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)
   transform(ast, {
     nodeTransforms: [
+      transformFor,
       ...(options.prefixIdentifiers ? [transformExpression] : []),
-      transformText,
-      transformElement
+      transformElement,
+      transformText
     ],
     ...options
   })
@@ -149,6 +153,20 @@ describe('compiler: transform text', () => {
     expect(generate(root).code).toMatchSnapshot()
   })
 
+  test('<template v-for>', () => {
+    const root = transformWithTextOpt(
+      `<template v-for="i in list">foo</template>`
+    )
+    expect(root.children[0].type).toBe(NodeTypes.FOR)
+    const forNode = root.children[0] as ForNode
+    // should convert template v-for text children because they are inside
+    // fragments
+    expect(forNode.children[0]).toMatchObject({
+      type: NodeTypes.TEXT_CALL
+    })
+    expect(generate(root).code).toMatchSnapshot()
+  })
+
   test('with prefixIdentifiers: true', () => {
     const root = transformWithTextOpt(`{{ foo }} bar {{ baz + qux }}`, {
       prefixIdentifiers: true
@@ -175,5 +193,30 @@ describe('compiler: transform text', () => {
         prefixIdentifiers: true
       }).code
     ).toMatchSnapshot()
+  })
+
+  // #3756
+  test('element with custom directives and only one text child node', () => {
+    const root = transformWithTextOpt(`<p v-foo>{{ foo }}</p>`)
+    expect(root.children.length).toBe(1)
+    expect(root.children[0].type).toBe(NodeTypes.ELEMENT)
+    expect((root.children[0] as ElementNode).children[0]).toMatchObject({
+      type: NodeTypes.TEXT_CALL,
+      codegenNode: {
+        type: NodeTypes.JS_CALL_EXPRESSION,
+        callee: CREATE_TEXT,
+        arguments: [
+          {
+            type: NodeTypes.INTERPOLATION,
+            content: {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'foo'
+            }
+          },
+          genFlagText(PatchFlags.TEXT)
+        ]
+      }
+    })
+    expect(generate(root).code).toMatchSnapshot()
   })
 })

@@ -27,6 +27,22 @@ describe('reactivity/collections', () => {
       expect(dummy).toBe(undefined)
     })
 
+    it('should observe mutations with observed value as key', () => {
+      let dummy
+      const key = reactive({})
+      const value = reactive({})
+      const map = reactive(new WeakMap())
+      effect(() => {
+        dummy = map.get(key)
+      })
+
+      expect(dummy).toBe(undefined)
+      map.set(key, value)
+      expect(dummy).toBe(value)
+      map.delete(key)
+      expect(dummy).toBe(undefined)
+    })
+
     it('should not observe custom property mutations', () => {
       let dummy
       const map: any = reactive(new WeakMap())
@@ -116,6 +132,11 @@ describe('reactivity/collections', () => {
       effect(mapSpy)
       map.set(key, NaN)
       expect(mapSpy).toHaveBeenCalledTimes(1)
+    })
+    it('should return proxy from WeakMap.set call', () => {
+      const map = reactive(new WeakMap())
+      const result = map.set({}, 'a')
+      expect(result).toBe(map)
     })
   })
 })

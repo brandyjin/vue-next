@@ -1,21 +1,25 @@
 {
   "name": "@vue/compiler-sfc",
-  "version": "3.0.0-alpha.1",
+  "version": "3.2.4",
   "description": "@vue/compiler-sfc",
   "main": "dist/compiler-sfc.cjs.js",
+  "types": "dist/compiler-sfc.d.ts",
   "files": [
     "dist"
   ],
-  "types": "dist/compiler-sfc.d.ts",
   "buildOptions": {
-    "prod": false,
+    "name": "VueCompilerSFC",
     "formats": [
-      "cjs"
-    ]
+      "cjs",
+      "esm-browser"
+    ],
+    "prod": false,
+    "enableNonBrowserBranches": true
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vuejs/vue.git"
+    "url": "git+https://github.com/vuejs/vue-next.git",
+    "directory": "packages/compiler-sfc"
   },
   "keywords": [
     "vue"
@@ -23,20 +27,33 @@
   "author": "Evan You",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/vuejs/vue/issues"
+    "url": "https://github.com/vuejs/vue-next/issues"
   },
-  "homepage": "https://github.com/vuejs/vue/tree/dev/packages/compiler-sfc#readme",
+  "homepage": "https://github.com/vuejs/vue-next/tree/master/packages/compiler-sfc#readme",
   "dependencies": {
-    "@vue/compiler-core": "3.0.0-alpha.1",
-    "consolidate": "^0.15.1",
+    "@babel/parser": "^7.15.0",
+    "@babel/types": "^7.15.0",
+    "@types/estree": "^0.0.48",
+    "@vue/compiler-core": "3.2.4",
+    "@vue/compiler-dom": "3.2.4",
+    "@vue/compiler-ssr": "3.2.4",
+    "@vue/ref-transform": "3.2.4",
+    "@vue/shared": "3.2.4",
+    "consolidate": "^0.16.0",
+    "estree-walker": "^2.0.2",
     "hash-sum": "^2.0.0",
     "lru-cache": "^5.1.1",
+    "magic-string": "^0.25.7",
     "merge-source-map": "^1.1.0",
-    "postcss": "^7.0.21",
-    "postcss-selector-parser": "^6.0.2",
-    "source-map": "^0.7.3"
+    "postcss": "^8.1.10",
+    "postcss-modules": "^4.0.0",
+    "postcss-selector-parser": "^6.0.4",
+    "source-map": "^0.6.1"
   },
   "devDependencies": {
-    "@types/lru-cache": "^5.1.0"
+    "@types/consolidate": "^0.14.0",
+    "@types/lru-cache": "^5.1.0",
+    "pug": "^3.0.1",
+    "sass": "^1.26.9"
   }
 }

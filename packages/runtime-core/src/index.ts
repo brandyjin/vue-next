@@ -1,12 +1,77 @@
-// Public API ------------------------------------------------------------------
+// Core API ------------------------------------------------------------------
 
 export const version = __VERSION__
-export * from './apiReactivity'
-export * from './apiWatch'
-export * from './apiLifecycle'
-export * from './apiInject'
+export {
+  // core
+  computed,
+  reactive,
+  ref,
+  readonly,
+  // utilities
+  unref,
+  proxyRefs,
+  isRef,
+  toRef,
+  toRefs,
+  isProxy,
+  isReactive,
+  isReadonly,
+  // advanced
+  customRef,
+  triggerRef,
+  shallowRef,
+  shallowReactive,
+  shallowReadonly,
+  markRaw,
+  toRaw,
+  // effect
+  effect,
+  stop,
+  ReactiveEffect,
+  // effect scope
+  effectScope,
+  EffectScope,
+  getCurrentScope,
+  onScopeDispose
+} from '@vue/reactivity'
+export {
+  watch,
+  watchEffect,
+  watchPostEffect,
+  watchSyncEffect
+} from './apiWatch'
+export {
+  onBeforeMount,
+  onMounted,
+  onBeforeUpdate,
+  onUpdated,
+  onBeforeUnmount,
+  onUnmounted,
+  onActivated,
+  onDeactivated,
+  onRenderTracked,
+  onRenderTriggered,
+  onErrorCaptured,
+  onServerPrefetch
+} from './apiLifecycle'
+export { provide, inject } from './apiInject'
 export { nextTick } from './scheduler'
-export { createComponent } from './apiCreateComponent'
+export { defineComponent } from './apiDefineComponent'
+export { defineAsyncComponent } from './apiAsyncComponent'
+export { useAttrs, useSlots } from './apiSetupHelpers'
+
+// <script setup> API ----------------------------------------------------------
+
+export {
+  // macros runtime, for typing and warnings only
+  defineProps,
+  defineEmits,
+  defineExpose,
+  withDefaults,
+  // internal
+  mergeDefaults,
+  withAsyncContext
+} from './apiSetupHelpers'
 
 // Advanced API ----------------------------------------------------------------
 
@@ -16,94 +81,157 @@ export { getCurrentInstance } from './component'
 
 // For raw render function users
 export { h } from './h'
-export {
-  createVNode,
-  cloneVNode,
-  mergeProps,
-  openBlock,
-  createBlock
-} from './vnode'
-// VNode type symbols
-export { Text, Comment, Fragment, Portal } from './vnode'
-// Internal Components
+// Advanced render function utilities
+export { createVNode, cloneVNode, mergeProps, isVNode } from './vnode'
+// VNode types
+export { Fragment, Text, Comment, Static } from './vnode'
+// Built-in components
+export { Teleport, TeleportProps } from './components/Teleport'
 export { Suspense, SuspenseProps } from './components/Suspense'
 export { KeepAlive, KeepAliveProps } from './components/KeepAlive'
-// VNode flags
-export { PublicShapeFlags as ShapeFlags } from './shapeFlags'
-import { PublicPatchFlags } from '@vue/shared'
-export const PatchFlags = PublicPatchFlags as {
-  // export patch flags as plain numbers to avoid d.ts relying on @vue/shared
-  // the enum type is internal anyway.
-  TEXT: number
-  CLASS: number
-  STYLE: number
-  PROPS: number
-  NEED_PATCH: number
-  FULL_PROPS: number
-  KEYED_FRAGMENT: number
-  UNKEYED_FRAGMENT: number
-  DYNAMIC_SLOTS: number
-  BAIL: number
-}
+export {
+  BaseTransition,
+  BaseTransitionProps
+} from './components/BaseTransition'
+// For using custom directives
+export { withDirectives } from './directives'
+// SSR context
+export { useSSRContext, ssrContextKey } from './helpers/useSsrContext'
 
-// For custom renderers
-export { createRenderer, RootRenderFunction } from './renderer'
+// Custom Renderer API ---------------------------------------------------------
+
+export { createRenderer, createHydrationRenderer } from './renderer'
+export { queuePostFlushCb } from './scheduler'
 export { warn } from './warning'
 export {
   handleError,
   callWithErrorHandling,
-  callWithAsyncErrorHandling
+  callWithAsyncErrorHandling,
+  ErrorCodes
 } from './errorHandling'
-
-// Internal, for compiler generated code
-// should sync with '@vue/compiler-core/src/runtimeConstants.ts'
-export { withDirectives } from './directives'
 export {
   resolveComponent,
   resolveDirective,
   resolveDynamicComponent
 } from './helpers/resolveAssets'
-export { renderList } from './helpers/renderList'
-export { toString } from './helpers/toString'
-export { toHandlers } from './helpers/toHandlers'
-export { renderSlot } from './helpers/renderSlot'
-export { createSlots } from './helpers/createSlots'
-export { setBlockTracking, createTextVNode, createCommentVNode } from './vnode'
-// Since @vue/shared is inlined into final builds,
-// when re-exporting from @vue/shared we need to avoid relying on their original
-// types so that the bundled d.ts does not attempt to import from it.
-import { capitalize as _capitalize, camelize as _camelize } from '@vue/shared'
-export const capitalize = _capitalize as (s: string) => string
-export const camelize = _camelize as (s: string) => string
+// For integration with runtime compiler
+export { registerRuntimeCompiler, isRuntimeOnly } from './component'
+export {
+  useTransitionState,
+  resolveTransitionHooks,
+  setTransitionHooks,
+  getTransitionRawChildren
+} from './components/BaseTransition'
+export { initCustomFormatter } from './customFormatter'
 
-// Internal, for integration with runtime compiler
-export { registerRuntimeCompiler } from './component'
+// For devtools
+export { devtools, setDevtoolsHook } from './devtools'
 
-// Types -----------------------------------------------------------------------
+// Types -------------------------------------------------------------------------
 
-export { App, AppConfig, AppContext, Plugin } from './apiApp'
-export { VNode, VNodeTypes, VNodeProps } from './vnode'
+import { VNode } from './vnode'
+import { ComponentInternalInstance } from './component'
+
+// Augment Ref unwrap bail types.
+// Note: if updating this, also update `types/refBail.d.ts`.
+declare module '@vue/reactivity' {
+  export interface RefUnwrapBailTypes {
+    runtimeCoreBailTypes:
+      | VNode
+      | {
+          // directly bailing on ComponentPublicInstance results in recursion
+          // so we use this as a bail hint
+          $: ComponentInternalInstance
+        }
+  }
+}
+
+export {
+  ReactiveEffectOptions,
+  DebuggerEvent,
+  DebuggerOptions,
+  TrackOpTypes,
+  TriggerOpTypes,
+  Ref,
+  ComputedRef,
+  WritableComputedRef,
+  UnwrapRef,
+  ShallowUnwrapRef,
+  WritableComputedOptions,
+  ToRefs,
+  DeepReadonly
+} from '@vue/reactivity'
+export {
+  WatchEffect,
+  WatchOptions,
+  WatchOptionsBase,
+  WatchCallback,
+  WatchSource,
+  WatchStopHandle
+} from './apiWatch'
+export { InjectionKey } from './apiInject'
+export {
+  App,
+  AppConfig,
+  AppContext,
+  Plugin,
+  CreateAppFunction,
+  OptionMergeFunction
+} from './apiCreateApp'
+export {
+  VNode,
+  VNodeChild,
+  VNodeTypes,
+  VNodeProps,
+  VNodeArrayChildren,
+  VNodeNormalizedChildren
+} from './vnode'
 export {
   Component,
+  ConcreteComponent,
   FunctionalComponent,
   ComponentInternalInstance,
-  RenderFunction
+  SetupContext,
+  ComponentCustomProps,
+  AllowedComponentProps
 } from './component'
+export { DefineComponent } from './apiDefineComponent'
 export {
   ComponentOptions,
+  ComponentOptionsMixin,
   ComponentOptionsWithoutProps,
-  ComponentOptionsWithObjectProps as ComponentOptionsWithProps,
-  ComponentOptionsWithArrayProps
-} from './apiOptions'
-
-export { ComponentPublicInstance } from './componentProxy'
-export { RendererOptions } from './renderer'
+  ComponentOptionsWithObjectProps,
+  ComponentOptionsWithArrayProps,
+  ComponentCustomOptions,
+  ComponentOptionsBase,
+  RenderFunction,
+  MethodOptions,
+  ComputedOptions,
+  RuntimeCompilerOptions
+} from './componentOptions'
+export { EmitsOptions, ObjectEmitsOptions } from './componentEmits'
+export {
+  ComponentPublicInstance,
+  ComponentCustomProperties,
+  CreateComponentPublicInstance
+} from './componentPublicInstance'
+export {
+  Renderer,
+  RendererNode,
+  RendererElement,
+  HydrationRenderer,
+  RendererOptions,
+  RootRenderFunction
+} from './renderer'
+export { RootHydrateFunction } from './hydration'
 export { Slot, Slots } from './componentSlots'
 export {
   Prop,
   PropType,
   ComponentPropsOptions,
-  ComponentObjectPropsOptions
+  ComponentObjectPropsOptions,
+  ExtractPropTypes,
+  ExtractDefaultPropTypes
 } from './componentProps'
 export {
   Directive,
@@ -114,3 +242,113 @@ export {
   DirectiveArguments
 } from './directives'
 export { SuspenseBoundary } from './components/Suspense'
+export { TransitionState, TransitionHooks } from './components/BaseTransition'
+export {
+  AsyncComponentOptions,
+  AsyncComponentLoader
+} from './apiAsyncComponent'
+export { HMRRuntime } from './hmr'
+
+// Internal API ----------------------------------------------------------------
+
+// **IMPORTANT** Internal APIs may change without notice between versions and
+// user code should avoid relying on them.
+
+// For compiler generated code
+// should sync with '@vue/compiler-core/src/runtimeHelpers.ts'
+export {
+  withCtx,
+  pushScopeId,
+  popScopeId,
+  withScopeId
+} from './componentRenderContext'
+export { renderList } from './helpers/renderList'
+export { toHandlers } from './helpers/toHandlers'
+export { renderSlot } from './helpers/renderSlot'
+export { createSlots } from './helpers/createSlots'
+export { withMemo, isMemoSame } from './helpers/withMemo'
+export {
+  openBlock,
+  createBlock,
+  setBlockTracking,
+  createTextVNode,
+  createCommentVNode,
+  createStaticVNode,
+  createElementVNode,
+  createElementBlock,
+  guardReactiveProps
+} from './vnode'
+export {
+  toDisplayString,
+  camelize,
+  capitalize,
+  toHandlerKey,
+  normalizeProps,
+  normalizeClass,
+  normalizeStyle
+} from '@vue/shared'
+
+// For test-utils
+export { transformVNodeArgs } from './vnode'
+
+// SSR -------------------------------------------------------------------------
+
+// **IMPORTANT** These APIs are exposed solely for @vue/server-renderer and may
+// change without notice between versions. User code should never rely on them.
+
+import { createComponentInstance, setupComponent } from './component'
+import { renderComponentRoot } from './componentRenderUtils'
+import { setCurrentRenderingInstance } from './componentRenderContext'
+import { isVNode, normalizeVNode } from './vnode'
+
+const _ssrUtils = {
+  createComponentInstance,
+  setupComponent,
+  renderComponentRoot,
+  setCurrentRenderingInstance,
+  isVNode,
+  normalizeVNode
+}
+
+/**
+ * SSR utils for \@vue/server-renderer. Only exposed in cjs builds.
+ * @internal
+ */
+export const ssrUtils = (
+  __NODE_JS__ || __ESM_BUNDLER__ ? _ssrUtils : null
+) as typeof _ssrUtils
+
+// 2.x COMPAT ------------------------------------------------------------------
+
+export { DeprecationTypes } from './compat/compatConfig'
+export { CompatVue } from './compat/global'
+export { LegacyConfig } from './compat/globalConfig'
+
+import { warnDeprecation } from './compat/compatConfig'
+import { createCompatVue } from './compat/global'
+import {
+  isCompatEnabled,
+  checkCompatEnabled,
+  softAssertCompatEnabled
+} from './compat/compatConfig'
+import { resolveFilter as _resolveFilter } from './helpers/resolveAssets'
+
+/**
+ * @internal only exposed in compat builds
+ */
+export const resolveFilter = __COMPAT__ ? _resolveFilter : null
+
+const _compatUtils = {
+  warnDeprecation,
+  createCompatVue,
+  isCompatEnabled,
+  checkCompatEnabled,
+  softAssertCompatEnabled
+}
+
+/**
+ * @internal only exposed in compat builds.
+ */
+export const compatUtils = (
+  __COMPAT__ ? _compatUtils : null
+) as typeof _compatUtils

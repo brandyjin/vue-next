@@ -23,6 +23,19 @@ describe('reactivity/collections', () => {
       expect(dummy).toBe(false)
     })
 
+    it('should observe mutations with observed value', () => {
+      let dummy
+      const value = reactive({})
+      const set = reactive(new WeakSet())
+      effect(() => (dummy = set.has(value)))
+
+      expect(dummy).toBe(false)
+      set.add(value)
+      expect(dummy).toBe(true)
+      set.delete(value)
+      expect(dummy).toBe(false)
+    })
+
     it('should not observe custom property mutations', () => {
       let dummy
       const set: any = reactive(new WeakSet())
@@ -85,6 +98,12 @@ describe('reactivity/collections', () => {
       observed.add(value)
       expect(observed.has(value)).toBe(true)
       expect(set.has(value)).toBe(false)
+    })
+
+    it('should return proxy from WeakSet.add call', () => {
+      const set = reactive(new WeakSet())
+      const result = set.add({})
+      expect(result).toBe(set)
     })
   })
 })

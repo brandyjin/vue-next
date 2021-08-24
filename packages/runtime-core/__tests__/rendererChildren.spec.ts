@@ -6,12 +6,8 @@ import {
   NodeTypes,
   TestElement,
   serialize,
-  serializeInner,
-  mockWarn
+  serializeInner
 } from '@vue/runtime-test'
-
-mockWarn()
-
 function toSpan(content: any) {
   if (typeof content === 'string') {
     return h('span', content.toString())
@@ -40,7 +36,7 @@ function shuffle(array: Array<any>) {
   return array
 }
 
-it('should patch previously empty children', () => {
+test('should patch previously empty children', () => {
   const root = nodeOps.createElement('div')
 
   render(h('div', []), root)
@@ -50,13 +46,22 @@ it('should patch previously empty children', () => {
   expect(inner(root)).toBe('<div>hello</div>')
 })
 
-it('should patch previously null children', () => {
+test('should patch previously null children', () => {
   const root = nodeOps.createElement('div')
 
   render(h('div'), root)
   expect(inner(root)).toBe('<div></div>')
 
   render(h('div', ['hello']), root)
+  expect(inner(root)).toBe('<div>hello</div>')
+})
+
+test('array children -> text children', () => {
+  const root = nodeOps.createElement('div')
+  render(h('div', [h('div')]), root)
+  expect(inner(root)).toBe('<div><div></div></div>')
+
+  render(h('div', 'hello'), root)
   expect(inner(root)).toBe('<div>hello</div>')
 })
 
@@ -316,21 +321,28 @@ describe('renderer: keyed children', () => {
     }
 
     for (let n = 0; n < samples; ++n) {
-      render(h('span', arr.map(n => spanNumWithOpacity(n, '1'))), root)
+      render(
+        h(
+          'span',
+          arr.map(n => spanNumWithOpacity(n, '1'))
+        ),
+        root
+      )
       elm = root.children[0] as TestElement
 
       for (let i = 0; i < elms; ++i) {
         expect(serializeInner(elm.children[i] as TestElement)).toBe(
           i.toString()
         )
-        opacities[i] = Math.random()
-          .toFixed(5)
-          .toString()
+        opacities[i] = Math.random().toFixed(5).toString()
       }
 
       const shufArr = shuffle(arr.slice(0))
       render(
-        h('span', arr.map(n => spanNumWithOpacity(shufArr[n], opacities[n]))),
+        h(
+          'span',
+          arr.map(n => spanNumWithOpacity(shufArr[n], opacities[n]))
+        ),
         root
       )
       elm = root.children[0] as TestElement

@@ -6,8 +6,8 @@ import {
   render,
   serializeInner,
   nextTick,
-  watch,
-  createComponent,
+  watchEffect,
+  defineComponent,
   triggerEvent,
   TestElement
 } from '@vue/runtime-test'
@@ -16,7 +16,7 @@ import {
 
 describe('api: setup context', () => {
   it('should expose return values to template render context', () => {
-    const Comp = createComponent({
+    const Comp = defineComponent({
       setup() {
         return {
           // ref should auto-unwrap
@@ -53,9 +53,10 @@ describe('api: setup context', () => {
       render: () => h(Child, { count: count.value })
     }
 
-    const Child = createComponent({
-      setup(props: { count: number }) {
-        watch(() => {
+    const Child = defineComponent({
+      props: { count: Number },
+      setup(props) {
+        watchEffect(() => {
           dummy = props.count
         })
         return () => h('div', props.count)
@@ -82,13 +83,13 @@ describe('api: setup context', () => {
       render: () => h(Child, { count: count.value })
     }
 
-    const Child = createComponent({
+    const Child = defineComponent({
       props: {
         count: Number
       },
 
       setup(props) {
-        watch(() => {
+        watchEffect(() => {
           dummy = props.count
         })
         return () => h('div', props.count)
@@ -119,9 +120,46 @@ describe('api: setup context', () => {
       // puts everything received in attrs
       // disable implicit fallthrough
       inheritAttrs: false,
-      props: {},
       setup(props: any, { attrs }: any) {
         return () => h('div', attrs)
+      }
+    }
+
+    const root = nodeOps.createElement('div')
+    render(h(Parent), root)
+    expect(serializeInner(root)).toMatch(`<div id="foo"></div>`)
+
+    // should update even though it's not reactive
+    toggle.value = false
+    await nextTick()
+    expect(serializeInner(root)).toMatch(`<div class="baz"></div>`)
+  })
+
+  // #4161
+  it('context.attrs in child component slots', async () => {
+    const toggle = ref(true)
+
+    const Parent = {
+      render: () => h(Child, toggle.value ? { id: 'foo' } : { class: 'baz' })
+    }
+
+    const Wrapper = {
+      render(this: any) {
+        return this.$slots.default()
+      }
+    }
+
+    const Child = {
+      inheritAttrs: false,
+      setup(_: any, { attrs }: any) {
+        return () => {
+          const vnode = h(Wrapper, null, {
+            default: () => [h('div', attrs)],
+            _: 1 // mark stable slots
+          })
+          vnode.dynamicChildren = [] // force optimized mode
+          return vnode
+        }
       }
     }
 
@@ -177,7 +215,7 @@ describe('api: setup context', () => {
         })
     }
 
-    const Child = createComponent({
+    const Child = defineComponent({
       props: {
         count: {
           type: Number,

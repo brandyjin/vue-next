@@ -1,6 +1,6 @@
 import {
   CompilerOptions,
-  parse,
+  baseParse as parse,
   transform,
   ElementNode,
   NodeTypes,
@@ -95,7 +95,9 @@ describe('compiler: transform <slot> outlets', () => {
   })
 
   test('default slot outlet with props', () => {
-    const ast = parseWithSlots(`<slot foo="bar" :baz="qux" />`)
+    const ast = parseWithSlots(
+      `<slot foo="bar" :baz="qux" :foo-bar="foo-bar" />`
+    )
     expect((ast.children[0] as ElementNode).codegenNode).toMatchObject({
       type: NodeTypes.JS_CALL_EXPRESSION,
       callee: RENDER_SLOT,
@@ -122,6 +124,16 @@ describe('compiler: transform <slot> outlets', () => {
               },
               value: {
                 content: `qux`,
+                isStatic: false
+              }
+            },
+            {
+              key: {
+                content: `fooBar`,
+                isStatic: true
+              },
+              value: {
+                content: `foo-bar`,
                 isStatic: false
               }
             }
@@ -216,12 +228,16 @@ describe('compiler: transform <slot> outlets', () => {
         `$slots`,
         `"default"`,
         `{}`,
-        [
-          {
-            type: NodeTypes.ELEMENT,
-            tag: `div`
-          }
-        ]
+        {
+          type: NodeTypes.JS_FUNCTION_EXPRESSION,
+          params: [],
+          returns: [
+            {
+              type: NodeTypes.ELEMENT,
+              tag: `div`
+            }
+          ]
+        }
       ]
     })
   })
@@ -235,12 +251,16 @@ describe('compiler: transform <slot> outlets', () => {
         `$slots`,
         `"foo"`,
         `{}`,
-        [
-          {
-            type: NodeTypes.ELEMENT,
-            tag: `div`
-          }
-        ]
+        {
+          type: NodeTypes.JS_FUNCTION_EXPRESSION,
+          params: [],
+          returns: [
+            {
+              type: NodeTypes.ELEMENT,
+              tag: `div`
+            }
+          ]
+        }
       ]
     })
   })
@@ -268,12 +288,16 @@ describe('compiler: transform <slot> outlets', () => {
             }
           ]
         },
-        [
-          {
-            type: NodeTypes.ELEMENT,
-            tag: `div`
-          }
-        ]
+        {
+          type: NodeTypes.JS_FUNCTION_EXPRESSION,
+          params: [],
+          returns: [
+            {
+              type: NodeTypes.ELEMENT,
+              tag: `div`
+            }
+          ]
+        }
       ]
     })
   })
@@ -301,13 +325,26 @@ describe('compiler: transform <slot> outlets', () => {
             }
           ]
         },
-        [
-          {
-            type: NodeTypes.ELEMENT,
-            tag: `div`
-          }
-        ]
+        {
+          type: NodeTypes.JS_FUNCTION_EXPRESSION,
+          params: [],
+          returns: [
+            {
+              type: NodeTypes.ELEMENT,
+              tag: `div`
+            }
+          ]
+        }
       ]
+    })
+  })
+
+  test('slot with slotted: false', async () => {
+    const ast = parseWithSlots(`<slot/>`, { slotted: false, scopeId: 'foo' })
+    expect((ast.children[0] as ElementNode).codegenNode).toMatchObject({
+      type: NodeTypes.JS_CALL_EXPRESSION,
+      callee: RENDER_SLOT,
+      arguments: [`$slots`, `"default"`, `{}`, `undefined`, `true`]
     })
   })
 

@@ -1,13 +1,32 @@
-export { ref, isRef, toRefs, Ref, UnwrapRef } from './ref'
+export {
+  ref,
+  shallowRef,
+  isRef,
+  toRef,
+  toRefs,
+  unref,
+  proxyRefs,
+  customRef,
+  triggerRef,
+  Ref,
+  ToRefs,
+  UnwrapRef,
+  ShallowUnwrapRef,
+  RefUnwrapBailTypes
+} from './ref'
 export {
   reactive,
-  isReactive,
   readonly,
+  isReactive,
   isReadonly,
-  readonlyProps,
+  isProxy,
+  shallowReactive,
+  shallowReadonly,
+  markRaw,
   toRaw,
-  markReadonly,
-  markNonReactive
+  ReactiveFlags,
+  DeepReadonly,
+  UnwrapNestedRefs
 } from './reactive'
 export {
   computed,
@@ -17,15 +36,27 @@ export {
   ComputedGetter,
   ComputedSetter
 } from './computed'
+export { deferredComputed } from './deferredComputed'
 export {
   effect,
   stop,
+  trigger,
+  track,
+  enableTracking,
   pauseTracking,
-  resumeTracking,
+  resetTracking,
   ITERATE_KEY,
   ReactiveEffect,
+  ReactiveEffectRunner,
   ReactiveEffectOptions,
+  EffectScheduler,
+  DebuggerOptions,
   DebuggerEvent
 } from './effect'
-export { lock, unlock } from './lock'
-export { OperationTypes } from './operations'
+export {
+  effectScope,
+  EffectScope,
+  getCurrentScope,
+  onScopeDispose
+} from './effectScope'
+export { TrackOpTypes, TriggerOpTypes } from './operations'
